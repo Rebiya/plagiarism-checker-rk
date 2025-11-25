@@ -1,43 +1,26 @@
 import re
+from typing import List
 
-def tokenize_text(text, keep_punctuation=False):
+
+def tokenize_text(text: str, keep_punctuation: bool = False) -> List[str]:
     """
-    Tokenizes the input text.
+    Tokenizes raw text content.
 
-    Args:
-        text (str): Input text string.
-        keep_punctuation (bool): If False, removes punctuation.
-
-    Returns:
-        list: List of tokens (strings)
+    Used for:
+    - User uploaded file (cleaned string)
+    - Reference corpus (cleaned string)
     """
     if not keep_punctuation:
-        # Remove punctuation except for spaces
-        text = re.sub(r'[^\w\s]', '', text)
-    # Split by whitespace
-    tokens = text.split()
-    return tokens
+        text = re.sub(r"[^\w\s]", "", text)
+
+    return text.split()
 
 
-def tokenize_file(file_path, keep_punctuation=False):
+def tokenize_file(file_path: str, keep_punctuation: bool = False) -> List[str]:
     """
-    Reads a file and tokenizes its content.
-
-    Args:
-        file_path (str): Path to input text file.
-        keep_punctuation (bool): If False, removes punctuation.
-
-    Returns:
-        list: List of tokens
+    Tokenizes a text file stored on disk.
     """
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         text = f.read()
-    tokens = tokenize_text(text, keep_punctuation=keep_punctuation)
-    return tokens
 
-
-if __name__ == "__main__":
-    FILE_PATH = "/home/rebu/Desktop/Projects/Interns/Icog labs/training-tasks/plagiarism-checker-rk/data/cleaned_data/all_cleaned.txt"  
-    tokens = tokenize_file(FILE_PATH)
-    print(f"Total tokens: {len(tokens)}")
-    print(f"First 50 tokens: {tokens[:50]}")
+    return tokenize_text(text, keep_punctuation)
