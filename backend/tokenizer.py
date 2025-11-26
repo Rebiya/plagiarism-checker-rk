@@ -2,11 +2,15 @@ import re
 from typing import List
 
 
-def tokenize_text(text: str) -> List[str]:
+def tokenize_text(text: str, keep_punctuation: bool = False) -> list:
     """
-    Tokenize text — assumes text is already cleaned.
+    Tokenizes raw text content.
+    Optionally removes punctuation.
     """
+    if not keep_punctuation:
+        text = re.sub(r"[^\w\s]", "", text)
     return text.split()
+
 
 
 
