@@ -2,7 +2,7 @@ import os
 import re
 from typing import Optional
 from io import BytesIO
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 
 # -------------------------
