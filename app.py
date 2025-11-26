@@ -1,24 +1,37 @@
 import streamlit as st
 import pandas as pd
-import time
 import sys, os
 
+# --------- Path Fix for backend imports ----------
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from backend.text_processing import process_uploaded_data
 from backend.pipeline import plagiarism_pipeline
 from backend.trie_runtime import load_trie, suggest_words
 
+
 TRIE_PATH = os.path.join("data", "trie", "trie.pkl")
 
+# =========================================================
+# BASE UI
+# =========================================================
 st.set_page_config(
     page_title="Rabin–Karp Plagiarism Checker",
     layout="wide"
 )
 
+st.title("📚 Rabin–Karp Plagiarism Checker")
+
+st.markdown("""
+Upload a suspect document (TXT or PDF) or paste text manually.  
+The system will compute similarity against reference corpus using Rabin–Karp n-gram hashing.
+
+🟢 Plus: **Live vocabulary autocomplete from Trie**
+""")
+
 
 # =========================================================
-# 1️⃣ LOAD TRIE WITH CACHE
+# LOAD TRIE (Cached)
 # =========================================================
 @st.cache_resource(show_spinner=False)
 def get_trie():
@@ -27,82 +40,55 @@ def get_trie():
 
 trie = get_trie()
 
-
 # =========================================================
-# 2️⃣ STREAMLIT UI
+# 🔍 Trie Global Search (optional)
 # =========================================================
-st.title("📚 Rabin–Karp Plagiarism Checker")
-
-st.markdown("""
-Upload a suspect document (TXT or PDF) or paste text manually.  
-The system will compute similarity against reference corpus using Rabin–Karp n-gram hashing.
-
----
-
-### 🧠 🔍 Word Autocomplete (Trie + Cleaned Reference Corpus)
-
-Type a word prefix to see **streaming autocompletion suggestions** from the reference corpus.
-""")
-
-# -------------------------
-# AUTOCOMPLETE INPUT
-# -------------------------
-prefix = st.text_input(
-    "Start typing a word to autocomplete:",
-    placeholder="Type here, e.g., 'clean', 'claim', 'machine'...",
-    key="autocomplete_input",
-)
-
-# ------------- debounce timer -----------------
-time.sleep(0.13)   # 🔥 small debounce (130 ms) prevents spam reruns
-
-suggestions = []
-if prefix.strip():
-    suggestions = suggest_words(prefix.strip(), trie, max_results=5)
-
-
-# =========================================================
-# 3️⃣ SHOW SUGGESTIONS AS PILLS
-# =========================================================
-if suggestions:
-    st.markdown("#### 🔗 Suggestions")
-    selected = st.pills(
-        label="Autocomplete",
-        options=suggestions,
-        selection_mode="single",
-        key="trie_suggestions",
-        help="Click to auto-complete the text box.",
-    )
-
-    if selected:
-        # Override text input value with clicked suggestion
-        st.session_state["autocomplete_input"] = selected
-
-
-# =========================================================
-# 4️⃣ SEARCH INSIDE TRIE WORDS (optional)
-# =========================================================
-with st.expander("🔍 Search inside words (contains)"):
-    search_query = st.text_input(
-        "Search substring inside dictionary words:",
-        placeholder="Example: 'ing'",
-        key="global_search"
-    )
-    if search_query:
-        # naive search — you can optimize later
+with st.expander("🔍 Search inside words"):
+    q = st.text_input("Substring", key="contains_search")
+    if q:
         results = []
         def scan_trie(node, path=""):
-            if node.is_end_of_word and search_query in path:
+            if node.is_end_of_word and q in path:
                 results.append(path)
             for c, child in node.children.items():
                 scan_trie(child, path + c)
         scan_trie(trie)
-
-        st.write(results[:25] if results else "No matches found.")
+        st.write(results[:25] if results else "No matches.")
 
 
 # =========================================================
-# 5️⃣ ORIGINAL PLAGIARISM CHECK UI (UNCHANGED)
+# 👑 SESSION STATE SETUP
+# =========================================================
+# user_text   = actual textarea content
+# clicked_word = suggestion pill chosen
+if "user_text" not in st.session_state:
+    st.session_state["user_text"] = ""
+
+if "clicked_word" not in st.session_state:
+    st.session_state["clicked_word"] = None
+
+
+# =========================================================
+# HANDLE CLICKED SUGGESTION BEFORE RENDER
+# =========================================================
+if st.session_state.clicked_word:
+
+    text = st.session_state.user_text.strip()
+
+    # split existing text
+    parts = text.split()
+    if len(parts) > 0:
+        parts[-1] = st.session_state.clicked_word  # replace only last
+    else:
+        parts = [st.session_state.clicked_word]
+
+    st.session_state.user_text = " ".join(parts) + " "
+    st.session_state.clicked_word = None
+    st.rerun()
+
+
+# =========================================================
+# MAIN INPUT UI
 # =========================================================
 st.divider()
 st.header("🕵️ Suspicious Document Check")
@@ -111,23 +97,53 @@ col1, col2 = st.columns([1, 2])
 
 with col1:
     uploaded_file = st.file_uploader("Upload suspect file:", type=["txt", "pdf"])
-    
+
 with col2:
-    input_text = st.text_area(
+    user_text = st.text_area(
         "Or paste text here:",
-        placeholder="Paste suspected text..."
+        key="user_text",
+        placeholder="Start typing...",
+        height=200
     )
 
 
-# -------------------------
-# PROCESS
-# -------------------------
+# =========================================================
+# 🔥 REAL-TIME AUTOCOMPLETE LOGIC
+# =========================================================
+suggestions = []
+prefix = ""
+
+if st.session_state.user_text.strip():
+    words = st.session_state.user_text.strip().split()
+    prefix = words[-1]
+    if prefix:
+        suggestions = suggest_words(prefix, trie, max_results=8)
+
+
+# =========================================================
+# SUGGESTION UI — LIVE, AUTO-UPDATE
+# =========================================================
+if suggestions:
+    clicked = st.pills(
+        label="Autocomplete",
+        options=suggestions,
+        selection_mode="single",
+        key="autocomplete_pills"
+    )
+
+    if clicked:
+        st.session_state.clicked_word = clicked
+        st.rerun()
+
+# =========================================================
+# PROCESS BUTTON — PLAGIARISM
+# =========================================================
 if st.button("Scan for Plagiarism"):
-    if uploaded_file is None and not input_text.strip():
+    if uploaded_file is None and not st.session_state.user_text.strip():
         st.error("⚠️ Please upload a file or paste text.")
         st.stop()
 
-    # 1️⃣ Get raw text
+    # 1️⃣ Extract text
     if uploaded_file:
         file_type = uploaded_file.name.split(".")[-1].lower()
         file_bytes = uploaded_file.read()
@@ -136,37 +152,33 @@ if st.button("Scan for Plagiarism"):
             st.error("Could not process file. Supported: TXT or PDF only.")
             st.stop()
     else:
-        raw_text = input_text
+        raw_text = st.session_state.user_text
 
-    # 2️⃣ Run full pipeline
+    # 2️⃣ Run plagiarism
     result = plagiarism_pipeline(raw_text)
 
-    # -------------------------
-    # DISPLAY RESULTS
-    # -------------------------
-    st.success("✔ Suspect text scanned successfully!")
+    st.success("✔ Scan complete!")
 
-    # 3️⃣ Plagiarism Score
+    # ---- Score ----
     st.markdown("### 📊 Similarity / Plagiarism Score")
     st.progress(int(result["score_percent"]))
     st.metric("Score (%)", f"{result['score_percent']:.2f}%")
-    
-    # 4️⃣ Cleaned Text Preview
-    with st.expander("Preview of cleaned text"):
+
+    # ---- Clean preview ----
+    with st.expander("Cleaned Text Preview"):
         st.write(result["cleaned_text"][:1000] + ("..." if len(result["cleaned_text"]) > 1000 else ""))
 
-    # 5️⃣ Token & n-gram stats
+    # ---- Stats ----
     st.markdown("### 🔹 Statistics")
     st.write(f"Total tokens: **{result['tokens']}**")
     st.write(f"Total n-grams: **{result['ngrams_total']}**")
     st.write(f"Matched n-grams: **{result['ngrams_matched']}**")
     st.write(f"N-gram window size k: **{result['k']}**")
 
-    # 6️⃣ Show matches in a table (hash, start_index)
+    # ---- Matches ----
     if result["matches"]:
-        st.markdown("### 🔹 Sample matched n-grams")
-        df_matches = pd.DataFrame(result["matches"], columns=["Hash", "Start Index"])
-        st.dataframe(df_matches.head(50))  # show first 50 matches
+        st.markdown("### 🔹 Sample Matched n-grams")
+        df = pd.DataFrame(result["matches"], columns=["Hash", "Start Index"])
+        st.dataframe(df.head(50))
     else:
-        st.info("No matches found in reference corpus.")
-
+        st.info("No matches found.")
