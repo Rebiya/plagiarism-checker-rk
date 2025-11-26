@@ -4,12 +4,13 @@ from typing import List
 
 def tokenize_text(text: str, keep_punctuation: bool = False) -> list:
     """
-    Tokenizes raw text content.
-    Optionally removes punctuation.
+    Tokenizes text on whitespace and punctuation.
+    Punctuation is removed unless keep_punctuation=True.
     """
     if not keep_punctuation:
-        text = re.sub(r"[^\w\s]", "", text)
+        text = re.sub(r"[^\w\s]", " ", text)  # <-- replace punctuation with space
     return text.split()
+
 
 
 
