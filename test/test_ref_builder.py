@@ -1,6 +1,6 @@
 import builtins
 import pytest
-from backend import ref_builder
+from backend import ac
 from backend import tokenizer
 from backend import plagiarism
 
@@ -19,4 +19,4 @@ def test_ref_builder_main(monkeypatch, tmp_path):
     monkeypatch.setattr("sys.argv", ["run_build_reference.py", "--input", str(fake_file)])
 
     # Run main
-    ref_builder.main()  # Should complete without exceptions
+    ac.main()  # Should complete without exceptions

@@ -2,7 +2,7 @@
 CLI with Google-style Trie Autocomplete + Plagiarism Scan
 
 USAGE:
-    python -m backend.cli_autocomplete
+    python -m backend.cli
 """
 
 import os
