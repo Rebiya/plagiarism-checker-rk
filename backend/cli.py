@@ -71,7 +71,7 @@ while True:
 
         print("\n🔍 Running plagiarism detection...\n")
 
-        result = plagiarism_pipeline(user_input)
+        result = plagiarism_pipeline(user_input, use_synonyms=True)
 
         print(f"🧠 Tokens: {result['tokens']}")
         print(f"📊 Total n-grams: {result['ngrams_total']}")

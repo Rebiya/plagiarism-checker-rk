@@ -16,14 +16,18 @@ from backend.plagiarism import (
     DEFAULT_B,
     DEFAULT_M
 )
-
+from backend.semantic_hashing import build_synonym_map, rolling_hash_syn, encode_tokens_syn, normalize_tokens
 
 def plagiarism_pipeline(raw_text: str,
                         k: int = DEFAULT_K,
                         B: int = DEFAULT_B,
-                        M: int = DEFAULT_M) -> Dict[str, Any]:
+                        M: int = DEFAULT_M,
+                        use_synonyms: bool = False) -> Dict[str, Any]:
+
+
+
     """
-    Full pipeline for suspect scan:
+    Full pipeline for suspect scan with optional synonym-awareness:
       1. Clean text
       2. Tokenize
       3. Load saved reference (hash set + vocab)
@@ -42,10 +46,16 @@ def plagiarism_pipeline(raw_text: str,
     reference_hashes, vocab = load_reference()
 
     # Step 4 -> Compute hashes against reference vocab
-    suspect_pairs = compute_suspect_hashes(tokens, vocab, k=k, B=B, M=M)
+
+    if use_synonyms:
+        # Synonym-aware hashes
+        syn_map = build_synonym_map(tokens)
+        suspect_pairs = rolling_hash_syn(tokens, vocab, k=k, synonym_map=syn_map)
+    else:
+        # Original hashing
+        suspect_pairs = compute_suspect_hashes(tokens, vocab, k=k, B=B, M=M)
 
     matched, total, matched_pairs = compare_hashes(suspect_pairs, reference_hashes)
-
     score = compute_plagiarism_score(matched, total)
 
     return {
@@ -55,5 +65,6 @@ def plagiarism_pipeline(raw_text: str,
         "ngrams_matched": matched,
         "score_percent": score,
         "matches": matched_pairs,
-        "k": k
+        "k": k,
+        "use_synonyms": use_synonyms
     }
